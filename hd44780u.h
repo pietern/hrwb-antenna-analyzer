@@ -23,10 +23,16 @@ void lcd_clear_display(void);
 // Return cursor to origin of LCD.
 void lcd_return_home(void);
 
-// Write character to LCD.
-void lcd_write(char c);
+// Set cursor to beginning of line.
+void lcd_setline(int8_t line);
 
-// Write buffer to LCD and advance cursor to the next line.
-void lcd_puts(const char *buf, int8_t len);
+// Write character to LCD.
+void lcd_putc(char c);
+
+// Write buffer to LCD.
+void lcd_puts(const char *buf);
+
+// Write PGM buffer to LCD.
+void lcd_puts_P(const char *buf);
 
 #endif

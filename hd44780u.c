@@ -1,4 +1,5 @@
 #include <avr/io.h>
+#include <avr/pgmspace.h>
 
 #include "hd44780u.h"
 #include "task.h"
@@ -107,22 +108,34 @@ void lcd_return_home(void) {
   lcd_yield_usec(1520);
 }
 
+void lcd_setline(int8_t line) {
+  lcd_send(INSTRUCTION, 0b10000000 + line * 0x40);
+  lcd_yield_usec(37);
+}
+
 void lcd_putc(char c) {
   lcd_send(DATA, c);
   lcd_yield_usec(37);
 }
 
-void lcd_puts(const char *buf, int8_t len) {
+void lcd_puts(const char *buf) {
   int8_t i;
-
-  for (i = 0; i < len; i++) {
-    lcd_send(DATA, buf[i]);
-    lcd_yield_usec(37);
+  for (i = 0;; i++) {
+    char c = buf[i];
+    if (c == 0) {
+      break;
+    }
+    lcd_putc(c);
   }
+}
 
-  // The LCD advances to the next line after character 40.
-  for (; i < 40; i++) {
-    lcd_send(INSTRUCTION, 0b00010100);
-    lcd_yield_usec(37);
+void lcd_puts_P(const char* buf) {
+  int8_t i;
+  for (i = 0;; i++) {
+    char c = pgm_read_byte(buf + i);
+    if (c == 0) {
+      break;
+    }
+    lcd_putc(c);
   }
 }
