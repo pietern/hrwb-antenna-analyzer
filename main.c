@@ -178,6 +178,10 @@ void setup() {
   DDRB = _BV(PB0); // Pro Micro RX LED
   DDRD = _BV(PD5); // Pro Micro TX LED
 
+  // Turn off LEDs.
+  PORTB |= _BV(PB0);
+  PORTD |= _BV(PD5);
+
   // Mode button (PF5) is an input.
   DDRF &= ~_BV(DDF5);
 
