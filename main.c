@@ -132,7 +132,7 @@ void lcd_show_mode_band() {
 // Returns if the state has changed and the new state is true-ish.
 // This is the equivalent of a keydown event.
 int8_t button_check(uint8_t* prev, uint8_t cur) {
-  int8_t ok = (cur != *prev && cur);
+  int8_t ok = (cur != *prev && *prev);
   *prev = cur;
   return ok;
 }
