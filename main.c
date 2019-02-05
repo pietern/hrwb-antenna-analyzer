@@ -137,9 +137,20 @@ int8_t button_check(uint8_t* prev, uint8_t cur) {
   return ok;
 }
 
+uint16_t time_substr(uint16_t t2, uint16_t t1) {
+  if (t2 > t1) {
+    return t2 - t1;
+  } else {
+    return t2 + (UINT16_MAX - t1) + 1;
+  }
+}
+
 void control_task(void* unused) {
   lcd_init();
 
+  uint16_t time_button = task_msec();
+  uint16_t time_tick;
+  uint8_t idle = 0;
   uint8_t mode_button_prev = 0;
   uint8_t band_button_prev = 0;
   memcpy_P(&mode_cur, &modes[mode_index], sizeof(struct mode));
@@ -152,22 +163,38 @@ void control_task(void* unused) {
     int8_t mode_button = button_check(&mode_button_prev, buttons & _BV(PINF5));
     int8_t band_button = button_check(&band_button_prev, buttons & _BV(PINF4));
 
-    if (mode_button) {
+    if (!idle && mode_button) {
       cli();
       mode_index = (mode_index + 1) % (sizeof(modes) / sizeof(modes[0]));
       memcpy_P(&mode_cur, &modes[mode_index], sizeof(struct mode));
       sei();
     }
 
-    if (band_button) {
+    if (!idle && band_button) {
       cli();
       band_index = (band_index + 1) % (sizeof(bands) / sizeof(bands[0]));
       memcpy_P(&band_cur, &bands[band_index], sizeof(struct band));
       sei();
     }
 
+    // Refresh LCD with mode/band selection if any button was pressed.
     if (mode_button || band_button) {
       lcd_show_mode_band();
+      time_button = task_msec();
+      idle = 0;
+    }
+
+    // Switch to idle mode when last button press is >= 1 second ago.
+    if (!idle && time_substr(task_msec(), time_button) >= 1000) {
+      idle = 1;
+      time_tick = time_substr(task_msec(), 250);
+    }
+
+    // Refresh LCD if enough time has passed since previous refresh.
+    if (idle && time_substr(task_msec(), time_tick) >= 250) {
+      time_tick = task_msec();
+      lcd_clear_display();
+      lcd_puts("Idle!");
     }
 
     task_sleep(0);
