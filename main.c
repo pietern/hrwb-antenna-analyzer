@@ -157,6 +157,7 @@ int8_t button_check(uint8_t* prev, uint8_t cur) {
   return ok;
 }
 
+// Subtract two uint16_t values, taking overflows into account.
 uint16_t time_substr(uint16_t t2, uint16_t t1) {
   if (t2 > t1) {
     return t2 - t1;
