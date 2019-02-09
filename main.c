@@ -149,8 +149,8 @@ void lcd_show_mode_band() {
   lcd_puts_P(band_cur.name);
 }
 
-// Returns if the state has changed and the new state is true-ish.
-// This is the equivalent of a keydown event.
+// Returns if the state has changed and the previous state was true-ish.
+// This is the equivalent of a key-up event.
 int8_t button_check(uint8_t* prev, uint8_t cur) {
   int8_t ok = (cur != *prev && *prev);
   *prev = cur;
