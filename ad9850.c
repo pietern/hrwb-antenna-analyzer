@@ -7,7 +7,6 @@ void dds_init(void) {
   // Configure pins as output pins
   DDRD |= _BV(PD0) | _BV(PD1) | _BV(PD4);
   DDRC |= _BV(PC6);
-
   // Zero all pins
   PORTD &= ~(_BV(PD0) | _BV(PD1) | _BV(PD4));
   PORTC &= ~(_BV(PC6));
@@ -31,7 +30,6 @@ void dds_set_freq(uint32_t hz) {
   for (i = 0; i < 32; i++) {
     PORTD = (PORTD & ~_BV(PD0)) | ((f & 0x1) << PD0);
     PORTC |= _BV(PC6);
-
     PORTC &= ~_BV(PC6);
     f >>= 1;
   }
