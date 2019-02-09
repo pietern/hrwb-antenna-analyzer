@@ -10,22 +10,14 @@ struct mode {
   PGM_P name;
 };
 
-const char mode_swrmin[] PROGMEM = "SWR min";
-const char mode_swr15[] PROGMEM = "SWR <=1.5";
-const char mode_swr20[] PROGMEM = "SWR <=2.0";
+const char mode_swr_min[] PROGMEM = "SWR min";
 const char mode_band_start[] PROGMEM = "band start";
 const char mode_band_stop[] PROGMEM = "band stop";
 const char mode_band_mid[] PROGMEM = "band mid";
 
 const struct mode modes[] PROGMEM = {
   {
-    .name = mode_swrmin,
-  },
-  {
-    .name = mode_swr15,
-  },
-  {
-    .name = mode_swr20,
+    .name = mode_swr_min,
   },
   {
     .name = mode_band_start,
