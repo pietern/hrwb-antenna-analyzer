@@ -44,6 +44,10 @@ struct band {
   // Start/stop of sweep
   uint32_t fa;
   uint32_t fb;
+
+  // Start/stop of band
+  uint32_t start;
+  uint32_t stop;
 };
 
 const char band_160m[] PROGMEM = "160m";
@@ -62,51 +66,71 @@ const struct band bands[] PROGMEM = {
     .name = band_160m,
     .fa = 1500000,
     .fb = 2300000,
+    .start = 1600000,
+    .stop = 2000000,
   },
   {
     .name = band_80m,
     .fa = 2000000,
     .fb = 5000000,
+    .start = 3500000,
+    .stop = 4000000,
   },
   {
     .name = band_60m,
     .fa = 5000000,
     .fb = 6000000,
+    .start = 5332000,
+    .stop = 5405000,
   },
   {
     .name = band_40m,
     .fa = 6000000,
     .fb = 8000000,
+    .start = 7000000,
+    .stop = 7300000,
   },
   {
     .name = band_30m,
     .fa = 9000000,
     .fb = 11000000,
+    .start = 10100000,
+    .stop = 10150000,
   },
   {
     .name = band_20m,
     .fa = 13000000,
     .fb = 16000000,
+    .start = 14000000,
+    .stop = 14350000,
   },
   {
     .name = band_17m,
     .fa = 17000000,
     .fb = 19000000,
+    .start = 18068000,
+    .stop = 18168000,
   },
   {
     .name = band_15m,
     .fa = 20000000,
     .fb = 23000000,
+    .start = 21000000,
+    .stop = 21450000,
   },
   {
     .name = band_12m,
     .fa = 24000000,
     .fb = 26000000,
+    .start = 24890000,
+    .stop = 24990000,
   },
   {
     .name = band_10m,
     .fa = 28000000,
     .fb = 30000000,
+    .start = 28000000,
+    .stop = 29700000,
   },
 };
 
