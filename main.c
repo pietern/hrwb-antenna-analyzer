@@ -3,6 +3,7 @@
 #include <avr/pgmspace.h>
 #include <stdio.h>
 
+#include "ad9850.h"
 #include "hd44780u.h"
 #include "task.h"
 
@@ -134,6 +135,9 @@ struct band mode_cur;
 uint8_t band_index = 0;
 struct band band_cur;
 
+// The sweep task writes its output directly to this buffer.
+char lcd_buffer[2][17];
+
 // Show mode/band selection on LCD display.
 void lcd_show_mode_band() {
   lcd_clear_display();
@@ -203,17 +207,217 @@ void control_task(void* unused) {
     // Switch to idle mode when last button press is >= 1 second ago.
     if (!idle && time_substr(task_msec(), time_button) >= 1000) {
       idle = 1;
-      time_tick = time_substr(task_msec(), 250);
+      time_tick = time_substr(task_msec(), 500);
     }
 
     // Refresh LCD if enough time has passed since previous refresh.
-    if (idle && time_substr(task_msec(), time_tick) >= 250) {
+    if (idle && time_substr(task_msec(), time_tick) >= 500) {
       time_tick = task_msec();
       lcd_clear_display();
-      lcd_puts("Idle!");
+      lcd_setline(0);
+      lcd_puts(lcd_buffer[0]);
+      lcd_setline(1);
+      lcd_puts(lcd_buffer[1]);
     }
 
     task_sleep(0);
+  }
+}
+
+// Pointer to task waiting for ADC conversion.
+task_t* task_adc = 0;
+
+// Wake up task waiting for ADC conversion.
+ISR(ADC_vect) {
+  task_wakeup(task_adc);
+}
+
+uint16_t adc_sample(uint8_t port) {
+  uint8_t adcl, adch;
+
+  // Select port.
+  ADMUX = _BV(REFS0) | port;
+
+  // ADC Start Conversion.
+  ADCSRA |= (_BV(ADSC) | _BV(ADIE));
+
+  // Wait for ADC Conversion Complete interrupt.
+  //while (ADCSRA & _BV(ADSC));
+  task_adc = task_current();
+  task_suspend(0);
+
+  // Load and combine result.
+  adcl = ADCL;
+  adch = ADCH;
+  return (adch << 8) | adcl;
+}
+
+uint16_t vswr_at_frequency(uint32_t hz, uint8_t delay) {
+  uint32_t fwd;
+  uint32_t rev;
+  uint32_t vswr;
+
+  dds_set_freq(hz);
+  task_sleep(delay);
+
+  // Forward power (channel A1, port ADC6).
+  fwd = adc_sample(6);
+
+  // Reverse power (channel A0, port ADC7).
+  rev = adc_sample(7);
+
+  // Compute integer VSWR (in thousandths).
+  vswr = (1000 * (fwd + rev)) / (fwd - rev);
+  if (vswr > 0xffff) {
+    vswr = 0xffff;
+  }
+
+  return vswr;
+}
+
+uint32_t round_step_size(uint32_t step_size) {
+  uint32_t base = 1;
+  while ((step_size / 10) > 0) {
+    uint8_t remainder = step_size % 10;
+    base *= 10;
+    step_size /= 10;
+    if (remainder) {
+      step_size++;
+    }
+  }
+
+  // Turn 600 into 1000.
+  if (step_size > 5) {
+    return base * 10;
+  }
+
+  // Turn 201 into 500.
+  if (step_size > 2) {
+    return base * 5;
+  }
+
+  // Turn 200 into 200, 100 into 100.
+  return base * step_size;
+}
+
+void sweep_swr_min(struct band band) {
+  uint16_t min_vswr = UINT16_MAX;
+  uint32_t min_hz = 0;
+  uint32_t start;
+  uint32_t stop;
+  uint32_t step_size;
+
+  // Sweep entire band.
+  //
+  // Use zero delay when computing VSWR for a frequency. This will not
+  // result in an accurate reading but is good enough to find a rough
+  // frequency where the VSWR is minimal.
+  //
+  start = band.fa;
+  stop = band.fb;
+  step_size = round_step_size((stop - start) / 100);
+  for (uint32_t hz = start; hz < stop; hz += step_size) {
+    uint16_t vswr = vswr_at_frequency(hz, 0);
+    if (vswr < min_vswr) {
+      min_vswr = vswr;
+      min_hz = hz;
+    }
+  }
+
+  // Sweep minimum range.
+  //
+  // Use 10ms delay when computing VSWR for a frequency. This results
+  // in a more accurate reading than before, because the power levels
+  // are given a chance to settle before the ADC conversion.
+  //
+  start = min_hz - step_size;
+  stop = min_hz + step_size;
+  step_size = round_step_size((stop - start) / 20);
+  for (uint32_t hz = start; hz < stop; hz += step_size) {
+    uint16_t vswr = vswr_at_frequency(hz, 10);
+    if (vswr < min_vswr) {
+      min_vswr = vswr;
+      min_hz = hz;
+    }
+  }
+
+  snprintf(
+    lcd_buffer[0],
+    sizeof(lcd_buffer[0]),
+    "Freq: %2lu.%06lu",
+    min_hz / 1000000,
+    min_hz % 1000000);
+  snprintf(
+    lcd_buffer[1],
+    sizeof(lcd_buffer[1]),
+    "SWR: %2u.%03u",
+    min_vswr / 1000,
+    min_vswr % 1000);
+}
+
+void sweep_band_position(struct band band, uint32_t hz) {
+  uint32_t sum_vswr = 0;
+  uint16_t vswr = 0;
+  uint8_t i;
+  uint8_t n = 20;
+
+  // Configure frequency and let settle.
+  vswr_at_frequency(hz, 20);
+
+  // Take multiple VSWR measurements.
+  for (i = 0; i < n; i++) {
+    sum_vswr += vswr_at_frequency(hz, 20);
+  }
+
+  // Compute average VSWR.
+  vswr = sum_vswr / n;
+
+  snprintf(
+    lcd_buffer[0],
+    sizeof(lcd_buffer[0]),
+    "Freq: %2lu.%06lu",
+    hz / 1000000,
+    hz % 1000000);
+  snprintf(
+    lcd_buffer[1],
+    sizeof(lcd_buffer[1]),
+    "SWR: %2u.%03u",
+    vswr / 1000,
+    vswr % 1000);
+}
+
+void sweep_task(void* unused) {
+  // ADC Enable.
+  ADCSRA = _BV(ADEN);
+
+  // Prescaler at 128 to turn 16 MHz into 125 KHz.
+  ADCSRA |= _BV(ADPS2) | _BV(ADPS1) | _BV(ADPS0);
+
+  // Ports ADC6 and ADC7 are inputs.
+  DDRF &= ~_BV(DDF7);
+  DDRF &= ~_BV(DDF6);
+  PORTF &= ~_BV(PF7);
+  PORTF &= ~_BV(PF6);
+
+  dds_init();
+  dds_reset();
+
+  while (1) {
+    switch (mode_index) {
+    case 0:
+      sweep_swr_min(band_cur);
+      break;
+    case 1:
+      sweep_band_position(band_cur, band_cur.start);
+      break;
+    case 2:
+      sweep_band_position(band_cur, band_cur.stop);
+      break;
+    case 3:
+      sweep_band_position(band_cur, (band_cur.start + band_cur.stop) / 2);
+      break;
+    }
+    task_yield();
   }
 }
 
@@ -237,5 +441,6 @@ int main() {
   setup();
   task_init();
   task_create(control_task, 0);
+  task_create(sweep_task, 0);
   task_start();
 }
