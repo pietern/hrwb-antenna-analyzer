@@ -242,7 +242,6 @@ uint16_t adc_sample(uint8_t port) {
   ADCSRA |= (_BV(ADSC) | _BV(ADIE));
 
   // Wait for ADC Conversion Complete interrupt.
-  //while (ADCSRA & _BV(ADSC));
   task_adc = task_current();
   task_suspend(0);
 
