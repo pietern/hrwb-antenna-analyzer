@@ -218,11 +218,12 @@ void control_task(void* unused) {
 }
 
 void setup() {
-  DDRB = _BV(PB0); // Pro Micro RX LED
-  DDRD = _BV(PD5); // Pro Micro TX LED
-
-  // Turn off LEDs.
+  // Turn off Pro Micro RX LED.
+  DDRB |= _BV(PB0);
   PORTB |= _BV(PB0);
+
+  // Turn off Pro Micro TX LED.
+  DDRD |= _BV(PD5);
   PORTD |= _BV(PD5);
 
   // Mode button (PF5) is an input.
