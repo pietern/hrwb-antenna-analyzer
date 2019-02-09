@@ -11,7 +11,7 @@ CC             = avr-gcc
 # Override is only needed by avr-lib build system.
 
 override CFLAGS        = -g -Wall $(OPTIMIZE) -mmcu=$(MCU_TARGET) -mcall-prologues $(DEFS)
-override LDFLAGS       = -Wl,-gc-sections -Wl,-relax -Wl,-u,vfprintf -lprintf_min
+override LDFLAGS       = -Wl,-gc-sections -Wl,-relax -Wl,-u,vfprintf -lprintf_flt -lm
 override ASFLAGS       = -Wall -mmcu=$(MCU_TARGET) $(DEFS)
 
 OBJCOPY        = avr-objcopy
