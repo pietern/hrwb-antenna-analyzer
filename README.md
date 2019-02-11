@@ -9,7 +9,7 @@ interaction (buttons and the LCD) and measurements.
 
 ## Why
 
-The original firmware is not responsive to button pressed (it can take
+The original firmware is not very responsive to button presses (it can take
 many seconds before there is feedback to pressing a button) and
 doesn't hook up the mode button. I wanted to fix these issues, learn
 about the AD9850 chip, and have some fun hacking it all up.
