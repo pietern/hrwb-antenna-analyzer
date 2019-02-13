@@ -103,6 +103,12 @@ void Application_Jump_Check(void)
 			if (!(MCUSR & (1 << EXTRF)) || (MagicBootKey == MAGIC_BOOT_KEY))
 			  JumpToApplication = true;
 
+			/* If the MODE and BAND buttons are NOT pressed, jump to the application. */
+			/* Their inputs are pulled up and read 1 if not pressed. */
+			DDRF &= ~(_BV(DDF5) | _BV(DDF4));
+			if (PINF & (_BV(PINF5) | _BV(PINF4)))
+				JumpToApplication = true;
+
 			/* Clear reset source */
 			MCUSR &= ~(1 << EXTRF);
 		}
