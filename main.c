@@ -420,7 +420,7 @@ void sweep_band_edges(struct band band) {
   snprintf(
     lcd_buffer[1],
     sizeof(lcd_buffer[1]),
-    "%1u.%2u  %1u.%2u  %1u.%2u",
+    "%1u.%02u  %1u.%02u  %1u.%02u",
     (low / 1000),
     (low % 1000) / 10,
     (mid / 1000),
