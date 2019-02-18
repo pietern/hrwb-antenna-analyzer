@@ -7,6 +7,9 @@
 #include "hd44780u.h"
 #include "task.h"
 
+#define MIN(a, b) (((a) > (b)) ? (b) : (a));
+#define MAX(a, b) (((a) < (b)) ? (b) : (a));
+
 struct mode {
   PGM_P name;
 };
@@ -15,6 +18,7 @@ const char mode_swr_min[] PROGMEM = "SWR min";
 const char mode_band_start[] PROGMEM = "band start";
 const char mode_band_stop[] PROGMEM = "band stop";
 const char mode_band_mid[] PROGMEM = "band mid";
+const char mode_band_edge[] PROGMEM = "band edge";
 
 const struct mode modes[] PROGMEM = {
   {
@@ -28,6 +32,9 @@ const struct mode modes[] PROGMEM = {
   },
   {
     .name = mode_band_mid,
+  },
+  {
+    .name = mode_band_edge,
   },
 };
 
@@ -252,13 +259,10 @@ uint16_t adc_sample(uint8_t port) {
   return (adch << 8) | adcl;
 }
 
-uint16_t vswr_at_frequency(uint32_t hz, uint8_t delay) {
+uint16_t vswr_sample() {
   uint32_t fwd;
   uint32_t rev;
   uint32_t vswr;
-
-  dds_set_freq(hz);
-  task_sleep(delay);
 
   // Forward power (channel A1, port ADC6).
   fwd = adc_sample(6);
@@ -273,6 +277,29 @@ uint16_t vswr_at_frequency(uint32_t hz, uint8_t delay) {
   }
 
   return vswr;
+}
+
+uint16_t vswr_at_frequency(uint32_t hz, uint8_t delay) {
+  dds_set_freq(hz);
+  task_sleep(delay);
+  return vswr_sample();
+}
+
+uint16_t avg_vswr_at_frequency(uint32_t hz, uint8_t n) {
+  uint32_t sum = 0;
+  uint8_t i;
+
+  // Configure frequency and let settle.
+  dds_set_freq(hz);
+  task_sleep(20);
+
+  // Take multiple measurements.
+  for (i = 0; i < n; i++) {
+    sum += vswr_sample();
+  }
+
+  // Compute average.
+  return sum / n;
 }
 
 uint32_t round_step_size(uint32_t step_size) {
@@ -356,21 +383,9 @@ void sweep_swr_min(struct band band) {
 }
 
 void sweep_band_position(struct band band, uint32_t hz) {
-  uint32_t sum_vswr = 0;
-  uint16_t vswr = 0;
-  uint8_t i;
-  uint8_t n = 20;
+  uint16_t vswr;
 
-  // Configure frequency and let settle.
-  vswr_at_frequency(hz, 20);
-
-  // Take multiple VSWR measurements.
-  for (i = 0; i < n; i++) {
-    sum_vswr += vswr_at_frequency(hz, 20);
-  }
-
-  // Compute average VSWR.
-  vswr = sum_vswr / n;
+  vswr = avg_vswr_at_frequency(hz, 20);
 
   snprintf(
     lcd_buffer[0],
@@ -384,6 +399,34 @@ void sweep_band_position(struct band band, uint32_t hz) {
     "SWR: %2u.%03u",
     vswr / 1000,
     vswr % 1000);
+}
+
+void sweep_band_edges(struct band band) {
+  uint16_t low;
+  uint16_t mid;
+  uint16_t high;
+
+  low = avg_vswr_at_frequency(band.start, 20);
+  low = MIN(9999, low);
+  mid = avg_vswr_at_frequency((band.start + band.stop) / 2, 20);
+  mid = MIN(9999, mid);
+  high = avg_vswr_at_frequency(band.stop, 20);
+  high = MIN(9999, high);
+
+  snprintf(
+    lcd_buffer[0],
+    sizeof(lcd_buffer[0]),
+    "A     B     C");
+  snprintf(
+    lcd_buffer[1],
+    sizeof(lcd_buffer[1]),
+    "%1u.%2u  %1u.%2u  %1u.%2u",
+    (low / 1000),
+    (low % 1000) / 10,
+    (mid / 1000),
+    (mid % 1000) / 10,
+    (high / 1000),
+    (high % 1000) / 10);
 }
 
 void sweep_task(void* unused) {
@@ -415,6 +458,9 @@ void sweep_task(void* unused) {
       break;
     case 3:
       sweep_band_position(band_cur, (band_cur.start + band_cur.stop) / 2);
+      break;
+    case 4:
+      sweep_band_edges(band_cur);
       break;
     }
     task_yield();
